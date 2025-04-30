@@ -10,7 +10,7 @@ class VoiceAssistant {
         this.isListening = false;
         
         // Gemini API key
-        this.apiKey = 'AIzaSyCssFNizC7238Iv9fW9M0iKR29VxqFLY9o';
+        this.apiKey = 'AIzaSyDHRJizYVTTUNAluESxKYIDbitsL-RDUIo';
         
         this.setupRecognition();
     }
