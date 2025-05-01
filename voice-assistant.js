@@ -10,9 +10,11 @@ class VoiceAssistant {
         this.isListening = false;
         
         // Gemini API key
-        this.apiKey = 'AIzaSyDSmJBRoyMgFEBm-uqGwJPzKZiZVxSJ5DY';
+        this.apiKey = 'AIzaSyDlxeaia9aDghbDmzD_jDbw2GW_v8HyD5I';
+        this.modelName = 'gemini-1.5-flash'; // Using the new model name
         
         this.setupRecognition();
+        this.testAPI(); // Test API connection
     }
 
     setupRecognition() {
@@ -50,6 +52,46 @@ class VoiceAssistant {
         };
     }
 
+    async testAPI() {
+        try {
+            console.log('Testing API connection...');
+            const testPrompt = "Test connection";
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${this.apiKey}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: testPrompt
+                        }]
+                    }]
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('API Test Error Details:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorData
+                });
+                this.showError(`API connection failed: ${errorData.error?.message || 'Unknown error'}`);
+                return false;
+            }
+
+            const data = await response.json();
+            console.log('API Test Response:', data);
+            this.showMessage("API connection successful!");
+            return true;
+        } catch (error) {
+            console.error('API Test Error:', error);
+            this.showError(`API connection failed: ${error.message}`);
+            return false;
+        }
+    }
+
     async getGeminiResponse(query) {
         try {
             const prompt = `
@@ -66,7 +108,7 @@ class VoiceAssistant {
                 Please respond in simple text format.
             `;
 
-            const response = await fetch('https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=' + this.apiKey, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.modelName}:generateContent?key=${this.apiKey}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -81,7 +123,13 @@ class VoiceAssistant {
             });
 
             if (!response.ok) {
-                throw new Error('API request failed');
+                const errorData = await response.json();
+                console.error('API Error Details:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorData
+                });
+                throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
             }
 
             const data = await response.json();
@@ -95,13 +143,12 @@ class VoiceAssistant {
                 this.showMessage(answer);
                 this.speak(answer);
             } else {
-                throw new Error('Invalid response format');
+                throw new Error('Invalid response format from API');
             }
         } catch (error) {
-            console.error('Error:', error);
-            const errorMessage = "I'm having trouble getting that information right now. Please try again.";
-            this.showError(errorMessage);
-            this.speak(errorMessage);
+            console.error('Error in getGeminiResponse:', error);
+            this.showError(`Sorry, I'm having trouble connecting to the knowledge base: ${error.message}`);
+            this.speak("Sorry, I'm having trouble connecting to the knowledge base. Please try again later.");
         }
     }
 
@@ -195,6 +242,68 @@ class VoiceAssistant {
         } else {
             icon.className = 'fas fa-microphone';
             button.classList.remove('listening');
+        }
+    }
+
+    async getOpenAIResponse(query) {
+        try {
+            const prompt = `
+                You are a helpful assistant for Vel Tech University in Chennai, India. 
+                Answer the following question about the university: "${query}"
+                
+                Important guidelines:
+                1. Provide only the direct answer without any formatting or symbols
+                2. Keep responses natural and conversational
+                3. Don't use markdown, asterisks, or any special characters
+                4. Don't mention that you are an AI or assistant
+                5. Just give the information directly
+                
+                Please respond in simple text format.
+            `;
+
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-3.5-turbo",
+                    messages: [{
+                        role: "user",
+                        content: prompt
+                    }],
+                    max_tokens: 500
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('API Error Details:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorData
+                });
+                throw new Error(`API request failed: ${errorData.error?.message || 'Unknown error'}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+                let answer = data.choices[0].message.content;
+                
+                // Clean up the response
+                answer = this.cleanResponse(answer);
+                
+                this.showMessage(answer);
+                this.speak(answer);
+            } else {
+                throw new Error('Invalid response format from API');
+            }
+        } catch (error) {
+            console.error('Error in getOpenAIResponse:', error);
+            this.showError(`Sorry, I'm having trouble connecting to the knowledge base: ${error.message}`);
+            this.speak("Sorry, I'm having trouble connecting to the knowledge base. Please try again later.");
         }
     }
 }
